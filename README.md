@@ -12,3 +12,7 @@ The inactive button is the currently active profile. There are 2 ways to set the
 This first version was made exactly to how I needed it to work. I may look to add more profiles in the future, which is why I store the settings in xml files to easily expand upon this in the future.
 
 ![MouseProfiles](https://github.com/user-attachments/assets/7faa6697-7b83-444b-98d4-0cad35ffc26d)
+
+## Download
+
+https://github.com/fraserelliott/MouseProfiles/releases/tag/1.0
