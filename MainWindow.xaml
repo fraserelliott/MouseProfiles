@@ -12,5 +12,6 @@
         <Button Content="Profile 2" Margin="10,88,10,0" VerticalAlignment="Top" Height="50" Click="Button_Click_2" Name="BtnProfile2" />
         <Slider Name="Slider_Profile1" IsSnapToTickEnabled="True" Minimum="1" Maximum="20" Margin="10,65,10,0" VerticalAlignment="Top" ValueChanged="Slider_Profile1_ValueChanged" />
         <Slider Name="Slider_Profile2" IsSnapToTickEnabled="True" Minimum="1" Maximum="20" Margin="10,143,10,10" VerticalAlignment="Top" ValueChanged="Slider_Profile2_ValueChanged" />
+        <CheckBox Name="DisableNotifications" Content="Disable notifications on minimising to tray" HorizontalAlignment="Left" Margin="10,171,10, 10" VerticalAlignment="Top" Checked="DisableNotifications_Checked" Unchecked="DisableNotifications_Unchecked" />
     </Grid>
 </Window>

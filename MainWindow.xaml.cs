@@ -1,17 +1,9 @@
-﻿using System.CodeDom;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Xml.Serialization;
 
 namespace MouseProfiles
@@ -24,39 +16,39 @@ namespace MouseProfiles
         [DllImport("User32.dll")]
         static extern Boolean SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
 
-        //static extern Boolean SystemParametersInfo(UInt32 uiAction, UInt32 uiParam, UInt32 pvParam, UInt32 fWinIni);
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern int SetCurrentProcessExplicitAppUserModelID(string AppID);
 
         const UInt32 SPI_GETMOUSESPEED = 0x0070;
         const UInt32 SPI_SETMOUSESPEED = 0x0071;
         const uint SPIF_UPDATEINIFILE = 0x01;
         const uint SPIF_SENDCHANGE = 0x02;
 
+        private NotifyIcon notifyIcon;
+        private bool isExit;
+
         string saveLocation;
         string filename = "Settings.xml";
         int activeProfile = 0;
 
-        public struct SliderData
-        {
-            public double Slider1Value { get; set; }
-            public double Slider2Value { get; set; }
-        }
-
         public MainWindow()
         {
             InitializeComponent();
+            CreateNotifyIcon();
+
+            SetAppUserModelId("FraserElliott.MouseProfiles");
 
             saveLocation = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\MouseProfiles\\";
-            System.Diagnostics.Debug.WriteLine(saveLocation);
 
             var dpi = VisualTreeHelper.GetDpi(this); // 'this' must be a Visual or derived from it
 
             FormattedText formattedTitle = new FormattedText(
                 this.Title,
                 CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
+                System.Windows.FlowDirection.LeftToRight,
                 new Typeface(this.FontFamily, this.FontStyle, this.FontWeight, this.FontStretch),
                 this.FontSize,
-                Brushes.Black,
+                System.Windows.Media.Brushes.Black,
                 VisualTreeHelper.GetDpi(this).PixelsPerDip // The required parameter for DPI scaling
             );
 
@@ -64,6 +56,62 @@ namespace MouseProfiles
             this.ResizeMode = ResizeMode.NoResize;
 
             LoadSettings();
+        }
+
+        private void CreateNotifyIcon()
+        {
+            notifyIcon = new NotifyIcon();
+            notifyIcon.Icon = new Icon("MouseProfiles.ico");
+            notifyIcon.Visible = true;
+            notifyIcon.DoubleClick += (s, args) => ShowMainWindow();
+
+            notifyIcon.ContextMenuStrip = new ContextMenuStrip();
+            notifyIcon.ContextMenuStrip.Items.Add("Open", null, (s, e) => ShowMainWindow());
+            notifyIcon.ContextMenuStrip.Items.Add("Exit", null, (s, e) => ExitApplication());
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized)
+            {
+                Hide();
+            }
+            base.OnStateChanged(e);
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            if (!isExit)
+            {
+                e.Cancel = true;
+                Hide();
+
+                if (DisableNotifications.IsChecked == false)
+                {
+                    var toast = new ToastWindow("Minimised to tray", "MouseProfiles is still running here.");
+                    toast.Show();
+                }
+            }
+            else
+            {
+                notifyIcon.Dispose();
+            }
+            
+            base.OnClosing(e);
+        }
+
+        private void ShowMainWindow()
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+        }
+
+        private void ExitApplication()
+        {
+            isExit = true;
+            notifyIcon.Dispose();
+            Close();
         }
 
         private void LoadSettings()
@@ -78,7 +126,7 @@ namespace MouseProfiles
                 File.Create(saveLocation + filename);
             } else
             {
-                XmlSerializer serializer = new XmlSerializer(typeof(SliderData));
+                XmlSerializer serializer = new XmlSerializer(typeof(SaveData));
 
                 try
                 {
@@ -86,10 +134,11 @@ namespace MouseProfiles
                     {
                         object? deserialized = serializer.Deserialize(stream);
 
-                        if (deserialized is SliderData data)
+                        if (deserialized is SaveData data)
                         {
                             Slider_Profile1.Value = data.Slider1Value;
                             Slider_Profile2.Value = data.Slider2Value;
+                            DisableNotifications.IsChecked = data.DisableNotifications;
                             int speed = GetMouseSpeed();
                             if (speed == (int)data.Slider1Value)
                             {
@@ -104,7 +153,7 @@ namespace MouseProfiles
                         }
                         else
                         {
-                            throw new Exception("SliderData not in expected format");
+                            throw new Exception("SaveData not in expected format");
                         }
 
                     }
@@ -119,20 +168,18 @@ namespace MouseProfiles
                 }
                 
             }
-
-
-
-            
-
-            System.Diagnostics.Debug.WriteLine(GetMouseSpeed());
         }
         private void SaveSettings()
         {
-            XmlSerializer serializer = new XmlSerializer(typeof(SliderData));
-            SliderData data = new SliderData
+            XmlSerializer serializer = new XmlSerializer(typeof(SaveData));
+
+            bool disablenotifications = DisableNotifications.IsChecked == null ? false : (bool)DisableNotifications.IsChecked;
+
+            SaveData data = new SaveData
             {
                 Slider1Value = Slider_Profile1.Value,
-                Slider2Value = Slider_Profile2.Value
+                Slider2Value = Slider_Profile2.Value,
+                DisableNotifications = disablenotifications
             };
 
             using (FileStream stream = new FileStream(saveLocation + filename, FileMode.Open))
@@ -209,6 +256,21 @@ namespace MouseProfiles
         private void Slider_Profile2_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             SliderValueChanged(2, (int)Slider_Profile2.Value);
+        }
+
+        public static void SetAppUserModelId(string appId)
+        {
+            SetCurrentProcessExplicitAppUserModelID(appId);
+        }
+
+        private void DisableNotifications_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveSettings();
+        }
+
+        private void DisableNotifications_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveSettings();
         }
     }
 }
